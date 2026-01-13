@@ -1,402 +1,219 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'profile.dart';
 
-class Halaman_Utama extends StatefulWidget {
-  const Halaman_Utama({super.key});
+class BerandaPage extends StatefulWidget {
+  const BerandaPage({super.key});
 
   @override
-  State<Halaman_Utama> createState() => _Halaman_UtamaState();
+  State<BerandaPage> createState() => _BerandaPageState();
 }
 
-class _Halaman_UtamaState extends State<Halaman_Utama> {
-  final TextEditingController _namaController = TextEditingController();
-  final TextEditingController _alamatController = TextEditingController();
-  final TextEditingController _npmController = TextEditingController();
+class _BerandaPageState extends State<BerandaPage> {
+  int _index = 0;
+  List<Map<String, String>> notes = [];
 
-  final List<String> _prodiList = ['Informatika', 'Mesin', 'Sipil', 'Arsitek'];
-  final List<String> _kelasList = ['A', 'B', 'C', 'D', 'E'];
+  final titleController = TextEditingController();
+  final contentController = TextEditingController();
 
-  String? _selectedKelas;
-  String? _selectedProdi;
-  String _jenisKelamin = 'Pria';
-
-  int? _editingIndex;
-
-  List<Map<String, dynamic>> _items = [];
-  static const String _prefsKey = 'submissions';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSaved();
-  }
-
-  Future<void> _loadSaved() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getStringList(_prefsKey);
-    if (raw != null) {
-      setState(() {
-        _items = raw.map((v) => jsonDecode(v) as Map<String, dynamic>).toList();
-      });
+  void addOrEdit({int? index}) {
+    if (index != null) {
+      titleController.text = notes[index]['title']!;
+      contentController.text = notes[index]['content']!;
+    } else {
+      titleController.clear();
+      contentController.clear();
     }
-  }
 
-  Future<void> _saveAll() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(
-      _prefsKey,
-      _items.map((e) => jsonEncode(e)).toList(),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              index == null ? "Tambah Catatan" : "Edit Catatan",
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: titleController,
+              decoration: InputDecoration(
+                labelText: "Judul",
+                prefixIcon: const Icon(Icons.title),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: contentController,
+              maxLines: 4,
+              decoration: InputDecoration(
+                labelText: "Isi Catatan",
+                prefixIcon: const Icon(Icons.edit_note),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.save),
+                label: const Text("Simpan"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  setState(() {
+                    if (index == null) {
+                      notes.add({
+                        "title": titleController.text,
+                        "content": contentController.text,
+                      });
+                    } else {
+                      notes[index] = {
+                        "title": titleController.text,
+                        "content": contentController.text,
+                      };
+                    }
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  // ============================ SUBMIT / UPDATE =============================
-  void _addOrUpdateItem() {
-    final nama = _namaController.text.trim();
-    final alamat = _alamatController.text.trim();
-    final npm = _npmController.text.trim();
-
-    if (nama.isEmpty || npm.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Nama & NPM wajib diisi")));
-      return;
-    }
-
-    if (_editingIndex == null) {
-      setState(() {
-        _items.insert(0, {
-          "nama": nama,
-          "alamat": alamat,
-          "npm": npm,
-          "kelas": _selectedKelas ?? "-",
-          "prodi": _selectedProdi ?? "-",
-          "jk": _jenisKelamin,
-          "createdAt": DateTime.now().toIso8601String(),
-        });
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Data berhasil ditambahkan")),
-      );
-    } else {
-      final oldCreate = _items[_editingIndex!]["createdAt"];
-
-      setState(() {
-        _items[_editingIndex!] = {
-          "nama": nama,
-          "alamat": alamat,
-          "npm": npm,
-          "kelas": _selectedKelas ?? "-",
-          "prodi": _selectedProdi ?? "-",
-          "jk": _jenisKelamin,
-          "createdAt": oldCreate,
-          "updatedAt": DateTime.now().toIso8601String(),
-        };
-
-        _editingIndex = null;
-      });
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Data berhasil diperbarui")));
-    }
-
-    _saveAll();
-    _clearForm();
-  }
-
-  void _clearForm() {
-    _namaController.clear();
-    _alamatController.clear();
-    _npmController.clear();
-
+  void delete(int index) {
     setState(() {
-      _selectedKelas = null;
-      _selectedProdi = null;
-      _jenisKelamin = "Pria";
-      _editingIndex = null;
+      notes.removeAt(index);
     });
   }
 
-  // ============================ DETAIL POPUP =============================
-  void _showDetail(Map<String, dynamic> item, int index) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          "Detail Mahasiswa",
-          style: TextStyle(fontWeight: FontWeight.bold),
+  void shareWA(String title, String content) async {
+    final msg = Uri.encodeComponent("$title\n$content");
+    final url = "https://wa.me/?text=$msg";
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = [
+      Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: const Text("My Notes"),
+          centerTitle: true,
+          backgroundColor: Colors.white,
+          elevation: 0,
+          foregroundColor: Colors.blue,
         ),
-        content: Text(
-          "Nama: ${item['nama']}\n"
-          "Alamat: ${item['alamat']}\n"
-          "NPM: ${item['npm']}\n"
-          "Kelas: ${item['kelas']}\n"
-          "Prodi: ${item['prodi']}\n"
-          "Jenis Kelamin: ${item['jk']}",
+        body: notes.isEmpty
+            ? const Center(
+                child: Text(
+                  "Belum ada catatan",
+                  style: TextStyle(color: Colors.grey),
+                ),
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: notes.length,
+                itemBuilder: (_, i) => Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        blurRadius: 8,
+                        color: Colors.blue.withOpacity(0.1),
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ListTile(
+                    title: Text(
+                      notes[i]['title']!,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                    subtitle: Text(notes[i]['content']!),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.share, color: Colors.blue),
+                          onPressed: () => shareWA(
+                            notes[i]['title']!,
+                            notes[i]['content']!,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.orange),
+                          onPressed: () => addOrEdit(index: i),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => delete(i),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () => addOrEdit(),
+          backgroundColor: Colors.blue,
+          icon: const Icon(Icons.add),
+          label: const Text("Tambah"),
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _editingIndex = index;
-                _namaController.text = item['nama'];
-                _alamatController.text = item['alamat'];
-                _npmController.text = item['npm'];
-                _selectedKelas = item['kelas'];
-                _selectedProdi = item['prodi'];
-                _jenisKelamin = item['jk'];
-              });
-            },
-            child: const Text("Edit"),
+      ),
+      const ProfilePage(),
+    ];
+
+    return Scaffold(
+      body: pages[_index],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _index,
+        selectedItemColor: Colors.blue,
+        onTap: (v) => setState(() => _index = v),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.note_alt_outlined),
+            label: "Notes",
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _items.removeAt(index);
-              });
-              _saveAll();
-            },
-            child: const Text("Hapus"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Tutup"),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            label: "Profil",
           ),
         ],
       ),
-    );
-  }
-
-  // ============================ UI BUILD =============================
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-
-      // ============================ APPBAR =============================
-      appBar: AppBar(
-        title: const Text(
-          "Data Mahasiswa",
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            shadows: [Shadow(color: Colors.black26, blurRadius: 4)],
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-
-      // ============================ BACKGROUND GRADIENT =============================
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF6328FF), Color(0xFF4E6BFF), Color(0xFF29D0FF)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 110, 16, 40),
-          child: Column(
-            children: [
-              // ============================ FORM GLASS CARD =============================
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.75),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: Colors.white.withOpacity(0.3)),
-                  boxShadow: [
-                    BoxShadow(
-                      blurRadius: 20,
-                      color: Colors.black.withOpacity(0.15),
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    _inputField(_namaController, Icons.person, "Nama"),
-                    const SizedBox(height: 12),
-                    _inputField(_alamatController, Icons.home, "Alamat"),
-                    const SizedBox(height: 12),
-                    _inputField(
-                      _npmController,
-                      Icons.confirmation_number,
-                      "NPM",
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    DropdownButtonFormField(
-                      value: _selectedKelas,
-                      decoration: _dropStyle("Pilih Kelas"),
-                      items: _kelasList
-                          .map(
-                            (e) => DropdownMenuItem(value: e, child: Text(e)),
-                          )
-                          .toList(),
-                      onChanged: (v) => setState(() => _selectedKelas = v),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    DropdownButtonFormField(
-                      value: _selectedProdi,
-                      decoration: _dropStyle("Pilih Prodi"),
-                      items: _prodiList
-                          .map(
-                            (e) => DropdownMenuItem(value: e, child: Text(e)),
-                          )
-                          .toList(),
-                      onChanged: (v) => setState(() => _selectedProdi = v),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    Row(
-                      children: [
-                        const Text("Jenis Kelamin:"),
-                        Radio(
-                          value: "Pria",
-                          groupValue: _jenisKelamin,
-                          onChanged: (v) => setState(() => _jenisKelamin = v!),
-                        ),
-                        const Text("Pria"),
-                        Radio(
-                          value: "Perempuan",
-                          groupValue: _jenisKelamin,
-                          onChanged: (v) => setState(() => _jenisKelamin = v!),
-                        ),
-                        const Text("Perempuan"),
-                      ],
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    // ============================ GRADIENT BUTTON =============================
-                    Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFF8C4BFF),
-                            Color(0xFF5564FF),
-                            Color(0xFF18E1FF),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: ElevatedButton(
-                        onPressed: _addOrUpdateItem,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: Text(
-                          _editingIndex == null ? "Submit" : "Update",
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
-              // ============================ LIST TITLE =============================
-              const Text(
-                "Daftar Mahasiswa",
-                style: TextStyle(
-                  fontSize: 20,
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  shadows: [Shadow(color: Colors.black45, blurRadius: 6)],
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // ============================ LIST CARD =============================
-              ..._items.map((item) {
-                int index = _items.indexOf(item);
-
-                return Card(
-                  elevation: 5,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    title: Text(
-                      item["nama"],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    subtitle: Text("${item['npm']} • ${item['prodi']}"),
-                    trailing: Text(
-                      item["kelas"],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                    ),
-                    onTap: () => _showDetail(item, index),
-                  ),
-                );
-              }),
-
-              if (_items.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(top: 20),
-                  child: Text(
-                    "Belum ada data",
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ======================================================================
-
-  Widget _inputField(controller, icon, label) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        prefixIcon: Icon(icon),
-        labelText: label,
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-      ),
-    );
-  }
-
-  InputDecoration _dropStyle(String text) {
-    return InputDecoration(
-      labelText: text,
-      filled: true,
-      fillColor: Colors.white,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
     );
   }
 }
